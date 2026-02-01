@@ -1,1 +1,835 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siam Mowing - บริการตัดหญ้าและดูแลสวน</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
+        
+        :root {
+            --brand-primary: #14532d; /* Green 900 */
+            --brand-accent: #16a34a;  /* Green 600 */
+            --bg-main: #f0fdf4;       /* Green 50 */
+        }
 
+        body { 
+            font-family: 'Sarabun', sans-serif; 
+            background-color: var(--bg-main);
+            color: #1e293b;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .image-slot {
+            aspect-ratio: 16/9;
+            border: 2px dashed #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+        .image-slot:hover { border-color: var(--brand-accent); background: #f0fdf4; }
+        .image-slot img { width: 100%; height: 100%; object-fit: cover; border-radius: 1.25rem; }
+        
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--brand-accent);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .fab-button {
+            box-shadow: 0 12px 24px -6px rgba(22, 163, 74, 0.4);
+            z-index: 50;
+        }
+
+        .category-chip {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.2rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            white-space: nowrap;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .delete-btn {
+            background: rgba(220, 38, 38, 0.9);
+            color: white;
+            padding: 8px;
+            border-radius: 12px;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s;
+        }
+        .delete-btn:hover { background: #b91c1c; transform: scale(1.1); }
+    </style>
+</head>
+<body class="min-h-screen flex justify-center items-center p-0 md:p-4">
+
+    <!-- กรอบแอปหลัก -->
+    <div class="w-full max-w-md bg-white shadow-2xl h-screen md:h-[850px] md:rounded-[2.5rem] overflow-hidden relative flex flex-col border border-slate-200" id="app">
+        
+        <!-- ================= หน้าหลัก (HOME) ================= -->
+        <div id="view-home" class="view h-full flex flex-col bg-slate-50">
+            <header class="bg-white px-6 pt-8 pb-4 z-20 border-b border-slate-100">
+                <div class="flex justify-between items-center mb-5">
+                    <div class="flex items-center gap-3">
+                        <!-- ไอคอนใบไม้ พื้นหลังสีเขียว -->
+                        <div class="bg-green-600 p-2.5 rounded-2xl text-white shadow-lg border border-green-700">
+                            <i data-lucide="leaf"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold tracking-tight text-slate-800">SiamMowing</h1>
+                            <p id="app-status" class="text-[10px] text-slate-400 font-medium uppercase tracking-wider italic">รับจ้างตัดหญ้า พ่นยา ครบวงจร</p>
+                        </div>
+                    </div>
+                    <button onclick="fetchPosts()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-green-600 transition-colors">
+                        <i data-lucide="refresh-cw" width="18"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-3 mb-4">
+                    <div class="relative group">
+                        <i data-lucide="search" class="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-green-600" width="18"></i>
+                        <input type="text" id="search-input" placeholder="ค้นหา ตัดหญ้าสนาม, รถไถ, โดรนพ่นยา..." 
+                            class="w-full pl-12 pr-4 py-3.5 bg-slate-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-green-500/20 focus:bg-white transition-all outline-none">
+                    </div>
+
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <select id="filter-province" onchange="handleProvinceChange('filter')" 
+                                class="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 appearance-none focus:ring-2 focus:ring-green-500 outline-none truncate">
+                                <option value="">ทุกจังหวัด</option>
+                            </select>
+                            <i data-lucide="map-pin" class="absolute left-3 top-3.5 text-green-600" width="16"></i>
+                        </div>
+                        <div class="relative flex-1">
+                            <select id="filter-amphoe" onchange="renderHome()" 
+                                class="w-full pl-9 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 appearance-none focus:ring-2 focus:ring-green-500 outline-none truncate">
+                                <option value="">ทุกอำเภอ</option>
+                            </select>
+                            <i data-lucide="navigation" class="absolute left-3 top-3.5 text-slate-400" width="16"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- หมวดหมู่พร้อมไอคอน -->
+                <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="type-filters"></div>
+            </header>
+
+            <div id="post-list" class="flex-1 overflow-y-auto p-5 space-y-5 pb-24 relative"></div>
+
+            <button onclick="router.navigate('create')" class="fab-button absolute bottom-8 right-6 w-16 h-16 bg-green-600 text-white rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
+                <i data-lucide="plus" width="32"></i>
+            </button>
+        </div>
+
+        <!-- ================= หน้ารายละเอียด (DETAIL) ================= -->
+        <div id="view-detail" class="view h-full flex flex-col bg-white hidden overflow-y-auto">
+            <div id="detail-content"></div>
+        </div>
+
+        <!-- ================= หน้าสร้างประกาศ (CREATE) ================= -->
+        <div id="view-create" class="view h-full flex flex-col bg-white hidden">
+            <header class="px-6 py-6 flex items-center justify-between border-b border-slate-50">
+                <button onclick="router.back()" class="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
+                    <i data-lucide="x"></i>
+                </button>
+                <h2 class="text-lg font-bold text-slate-800">ลงประกาศรับงาน</h2>
+                <div class="w-8"></div>
+            </header>
+
+            <form id="create-form" class="flex-1 overflow-y-auto p-6 space-y-8 pb-12">
+                <div class="space-y-4">
+                    <label class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                        <i data-lucide="camera" width="18" class="text-green-600"></i>
+                        รูปภาพผลงาน/ทีมงาน (สูงสุด 2 รูป)
+                    </label>
+                    <div class="grid grid-cols-1 gap-3">
+                        <div class="image-slot" id="slot-0" onclick="triggerFileInput(0)">
+                            <i data-lucide="plus-circle" class="text-slate-300 mb-1" width="32"></i>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">รูปหลัก</p>
+                            <input type="file" id="file-0" accept="image/*" class="hidden" onchange="handleFile(event, 0)">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="image-slot !aspect-square" id="slot-1" onclick="triggerFileInput(1)">
+                                <i data-lucide="image" class="text-slate-200" width="24"></i>
+                                <input type="file" id="file-1" accept="image/*" class="hidden" onchange="handleFile(event, 1)">
+                            </div>
+                            <div class="image-slot !aspect-square bg-gray-50 border-gray-100 border-2 border-solid flex items-center justify-center opacity-50 cursor-not-allowed">
+                                <span class="text-[10px] text-gray-400">สูงสุด 2 รูป</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 italic text-center">* ระบบจะย่อรูปอัตโนมัติเพื่อการอัปโหลดที่รวดเร็ว</p>
+                </div>
+
+                <div class="space-y-5">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 mb-2 block uppercase tracking-[0.1em]">หัวข้อบริการ / ชื่อทีมงาน</label>
+                        <input required name="title" class="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl p-4 text-sm focus:border-green-500 focus:bg-white outline-none transition-all" placeholder="เช่น ทีมงานลุงมี รับตัดหญ้าสวนยาง">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 mb-2 block uppercase tracking-[0.1em]">ประเภทบริการ</label>
+                            <select name="type" class="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl p-4 text-sm outline-none appearance-none focus:border-green-500">
+                                <option>รับจ้างตัดหญ้า</option>
+                                <option>พ่นยาฆ่าหญ้า</option>
+                                <option>ตัดกิ่งไม้</option>
+                                <option>บินโดรน</option>
+                                <option>ไถปรับหน้าดิน</option>
+                                <option>ดูแลสวน</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 mb-2 block uppercase tracking-[0.1em]">ราคาเริ่มต้น</label>
+                            <div class="flex gap-2">
+                                <input required name="price" type="number" class="flex-1 bg-slate-50 border-2 border-slate-50 rounded-2xl p-4 text-sm focus:border-green-500 outline-none" placeholder="0">
+                                <select name="priceUnit" class="w-20 bg-slate-50 border-2 border-slate-50 rounded-2xl text-[10px] font-bold">
+                                    <option value="ไร่">/ไร่</option>
+                                    <option value="งาน">/งาน</option>
+                                    <option value="ตร.ว.">/ตร.ว.</option>
+                                    <option value="เหมา">/เหมา</option>
+                                    <option value="ชม.">/ชม.</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 mb-2 block uppercase tracking-[0.1em]">จังหวัด</label>
+                            <select name="province" id="create-province" onchange="handleProvinceChange('create')" class="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl p-4 text-sm outline-none">
+                                <option value="">เลือกจังหวัด</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 mb-2 block uppercase tracking-[0.1em]">อำเภอ/เขต</label>
+                            <select name="amphoe" id="create-amphoe" class="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl p-4 text-sm outline-none">
+                                <option value="">เลือกอำเภอ</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- ช่องกรอก Line ID เพิ่มเข้ามา -->
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 mb-2 block uppercase tracking-[0.1em]">Line ID</label>
+                        <input name="lineId" class="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl p-4 text-sm focus:border-green-500 outline-none" placeholder="เช่น @siammowing หรือ ไอดีไลน์ส่วนตัว">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 mb-2 block uppercase tracking-[0.1em]">เบอร์โทรศัพท์ติดต่อ</label>
+                        <input required name="phone" type="tel" class="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl p-4 text-sm focus:border-green-500 outline-none" placeholder="08X-XXX-XXXX">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 mb-2 block uppercase tracking-[0.1em]">รายละเอียดบริการเพิ่มเติม</label>
+                        <textarea name="description" rows="4" class="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl p-4 text-sm focus:border-green-500 outline-none" placeholder="เครื่องมือที่ใช้, ประสบการณ์, รับงานขั้นต่ำ..."></textarea>
+                    </div>
+                </div>
+
+                <div class="sticky bottom-0 bg-white p-6 border-t border-slate-100 flex gap-3 z-30">
+                    <button type="button" onclick="router.back()" class="flex-1 bg-slate-100 text-slate-600 py-5 rounded-2xl font-bold active:scale-95 transition-all">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" id="submit-btn" class="flex-[2] bg-green-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-green-100 active:scale-95 transition-all">
+                        บันทึกและลงประกาศ
+                    </button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        // ✅ ใช้ URL ของ GAS (Google Apps Script)
+        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxUeGL4A-BK75ijDzkEo8CPqEc_e93wK9RnfZdK_d5cqsWxDYkz0WDtUui_coD0rU-L/exec'; 
+        
+        let state = {
+            posts: [],
+            currentView: 'home',
+            images: [null, null],
+            filterType: 'ทั้งหมด',
+            selectedPost: null
+        };
+
+        const categories = [
+            { label: 'ทั้งหมด', icon: 'layout-grid' },
+            { label: 'รับจ้างตัดหญ้า', icon: 'scissors' },
+            { label: 'พ่นยาฆ่าหญ้า', icon: 'droplets' },
+            { label: 'ตัดกิ่งไม้', icon: 'axe' },
+            { label: 'บินโดรน', icon: 'plane' },
+            { label: 'อื่นๆ', icon: 'sprout' }
+        ];
+
+        // --- COMPLETE THAI PROVINCES & DISTRICTS DATA ---
+        const thaiProvinces = {
+            "กระบี่": ["เมืองกระบี่", "เขาพนม", "เกาะลันตา", "คลองท่อม", "อ่าวลึก", "ปลายพระยา", "ลำทับ", "เหนือคลอง"],
+            "กรุงเทพมหานคร": ["พระนคร", "ดุสิต", "หนองจอก", "บางรัก", "บางเขน", "บางกะปิ", "ปทุมวัน", "ป้อมปราบศัตรูพ่าย", "พระโขนง", "มีนบุรี", "ลาดกระบัง", "ยานนาวา", "สัมพันธวงศ์", "พญาไท", "ธนบุรี", "บางกอกใหญ่", "ห้วยขวาง", "คลองสาน", "ตลิ่งชัน", "บางกอกน้อย", "บางขุนเทียน", "ภาษีเจริญ", "หนองแขม", "ราษฎร์บูรณะ", "บางพลัด", "ดินแดง", "บึงกุ่ม", "สาทร", "บางซื่อ", "จตุจักร", "บางคอแหลม", "ประเวศ", "คลองเตย", "สวนหลวง", "จอมทอง", "ดอนเมือง", "ราชเทวี", "ลาดพร้าว", "วัฒนา", "บางแค", "หลักสี่", "สายไหม", "คันนายาว", "สะพานสูง", "วังทองหลาง", "คลองสามวา", "บางนา", "ทวีวัฒนา", "ทุ่งครุ", "บางบอน"],
+            "กาญจนบุรี": ["เมืองกาญจนบุรี", "ไทรโยค", "บ่อพลอย", "ศรีสวัสดิ์", "ท่ามะกา", "ท่าม่วง", "ทองผาภูมิ", "สังขละบุรี", "พนมทวน", "เลาขวัญ", "ด่านมะขามเตี้ย", "หนองปรือ", "ห้วยกระเจา"],
+            "กาฬสินธุ์": ["เมืองกาฬสินธุ์", "นามน", "กมลาไสย", "ร่องคำ", "กุฉินารายณ์", "เขาวง", "ยางตลาด", "ห้วยเม็ก", "สหัสขันธ์", "คำม่วง", "ท่าคันโท", "หนองกุงศรี", "สมเด็จ", "ห้วยผึ้ง", "สามชัย", "นาคู", "ดอนจาน", "ฆ้องชัย"],
+            "กำแพงเพชร": ["เมืองกำแพงเพชร", "ไทรงาม", "คลองลาน", "ขาณุวรลักษบุรี", "คลองขลุง", "พรานกระต่าย", "ลานกระบือ", "ทรายทองวัฒนา", "ปางศิลาทอง", "บึงสามัคคี", "โกสัมพีนคร"],
+            "ขอนแก่น": ["เมืองขอนแก่น", "บ้านฝาง", "พระยืน", "หนองเรือ", "ชุมแพ", "สีชมพู", "น้ำพอง", "อุบลรัตน์", "กระนวน", "บ้านไผ่", "เปือยน้อย", "เมืองพล", "แวงใหญ่", "แวงน้อย", "หนองสองห้อง", "ภูเวียง", "มัญจาคีรี", "ชนบท", "เขาสวนกวาง", "ภูผาม่าน", "ซำสูง", "โคกโพธิ์ไชย", "หนองนาคำ", "บ้านแฮด", "โนนศิลา", "เวียงเก่า"],
+            "จันทบุรี": ["เมืองจันทบุรี", "ขลุง", "ท่าใหม่", "โป่งน้ำร้อน", "มะขาม", "แหลมสิงห์", "สอยดาว", "แก่งหางแมว", "นายายอาม", "เขาคิชฌกูฏ"],
+            "ฉะเชิงเทรา": ["เมืองฉะเชิงเทรา", "บางคล้า", "บางน้ำเปรี้ยว", "บางปะกง", "บ้านโพธิ์", "พนมสารคาม", "ราชสาส์น", "สนามชัยเขต", "แปลงยาว", "ท่าตะเกียบ", "คลองเขื่อน"],
+            "ชลบุรี": ["เมืองชลบุรี", "บ้านบึง", "หนองใหญ่", "บางละมุง", "พานทอง", "พนัสนิคม", "ศรีราชา", "เกาะสีชัง", "สัตหีบ", "บ่อทอง", "เกาะจันทร์"],
+            "ชัยนาท": ["เมืองชัยนาท", "มโนรมย์", "วัดสิงห์", "สรรพยา", "สรรคบุรี", "หันคา", "หนองมะโมง", "เนินขาม"],
+            "ชัยภูมิ": ["เมืองชัยภูมิ", "บ้านเขว้า", "คอนสวรรค์", "เกษตรสมบูรณ์", "หนองบัวแดง", "จัตุรัส", "บำเหน็จณรงค์", "หนองบัวระเหว", "เทพสถิต", "ภูเขียว", "บ้านแท่น", "แก้งคร้อ", "คอนสาร", "ภักดีชุมพล", "เนินสง่า", "ซับใหญ่"],
+            "ชุมพร": ["เมืองชุมพร", "ท่าแซะ", "ปะทิว", "หลังสวน", "ละแม", "พะโต๊ะ", "สวี", "ทุ่งตะโก"],
+            "เชียงราย": ["เมืองเชียงราย", "เวียงชัย", "เชียงของ", "เทิง", "พาน", "ป่าแดด", "แม่จัน", "เชียงแสน", "แม่สาย", "แม่สรวย", "เวียงป่าเป้า", "พญาเม็งราย", "เวียงแก่น", "ขุนตาล", "แม่ฟ้าหลวง", "แม่ลาว", "เวียงเชียงรุ้ง", "ดอยหลวง"],
+            "เชียงใหม่": ["เมืองเชียงใหม่", "จอมทอง", "แม่แจ่ม", "เชียงดาว", "ดอยสะเก็ด", "แม่แตง", "แม่ริม", "สะเมิง", "ฝาง", "แม่อาย", "พร้าว", "สันป่าตอง", "สันกำแพง", "สันทราย", "หางดง", "ฮอด", "ดอยเต่า", "อมก๋อย", "สารภี", "เวียงแหง", "ไชยปราการ", "แม่วาง", "แม่ออน", "ดอยหล่อ", "กัลยาณิวัฒนา"],
+            "ตรัง": ["เมืองตรัง", "กันตัง", "ย่านตาขาว", "ปะเหลียน", "สิเกา", "ห้วยยอด", "วังวิเศษ", "นาโยง", "รัษฎา", "หาดสำราญ"],
+            "ตราด": ["เมืองตราด", "คลองใหญ่", "เขาสมิง", "บ่อไร่", "แหลมงอบ", "เกาะกูด", "เกาะช้าง"],
+            "ตาก": ["เมืองตาก", "บ้านตาก", "สามเงา", "แม่สอด", "แม่ระมาด", "ท่าสองยาง", "พบพระ", "อุ้มผาง", "วังเจ้า"],
+            "นครนายก": ["เมืองนครนายก", "ปากพลี", "บ้านนา", "องครักษ์"],
+            "นครปฐม": ["เมืองนครปฐม", "กำแพงแสน", "นครชัยศรี", "ดอนตูม", "บางเลน", "สามพราน", "พุทธมณฑล"],
+            "นครพนม": ["เมืองนครพนม", "ปลาปาก", "ท่าอุเทน", "บ้านแพง", "ธาตุพนม", "เรณูนคร", "นาแก", "ศรีสงคราม", "นาหว้า", "โพนสวรรค์", "นาทม", "วังยาง"],
+            "นครราชสีมา": ["เมืองนครราชสีมา", "ครบุรี", "เสิงสาง", "คง", "บ้านเหลื่อม", "จักราช", "โชคชัย", "ด่านขุนทด", "โนนไทย", "โนนสูง", "ขามสะแกแสง", "บัวใหญ่", "ประทาย", "ปักธงชัย", "พิมาย", "ห้วยแถลง", "ชุมพวง", "สูงเนิน", "ขามทะเลสอ", "สีคิ้ว", "ปากช่อง", "หนองบุญมาก", "แก้งสนามนาง", "โนนแดง", "วังน้ำเขียว", "เทพารักษ์", "เมืองยาง", "พระทองคำ", "ลำทะเมนชัย", "บัวลาย", "สีดา", "เฉลิมพระเกียรติ"],
+            "นครศรีธรรมราช": ["เมืองนครศรีธรรมราช", "พรหมคีรี", "ลานสกา", "ฉวาง", "พิปูน", "เชียรใหญ่", "ชะอวด", "ท่าศาลา", "ทุ่งสง", "นาบอน", "ทุ่งใหญ่", "ปากพนัง", "ร่อนพิบูลย์", "สิชล", "ขนอม", "หัวไทร", "บางขัน", "ถ้ำพรรณรา", "จุฬาภรณ์", "พระพรหม", "นบพิตำ", "ช้างกลาง", "เฉลิมพระเกียรติ"],
+            "นครสวรรค์": ["เมืองนครสวรรค์", "โกรกพระ", "ชุมแสง", "หนองบัว", "บรรพตพิสัย", "เก้าเลี้ยว", "ตาคลี", "ท่าตะโก", "ไพศาลี", "พยุหะคีรี", "ลาดยาว", "ตากฟ้า", "แม่วงก์", "แม่เปิน", "ชุมตาบง"],
+            "นนทบุรี": ["เมืองนนทบุรี", "บางกรวย", "บางใหญ่", "บางบัวทอง", "ไทรน้อย", "ปากเกร็ด"],
+            "นราธิวาส": ["เมืองนราธิวาส", "ตากใบ", "บาเจาะ", "ยี่งอ", "ระแงะ", "รือเสาะ", "ศรีสาคร", "แว้ง", "สุคิริน", "สุไหงโก-ลก", "สุไหงปาดี", "จะแนะ", "เจาะไอร้อง"],
+            "น่าน": ["เมืองน่าน", "แม่จริม", "บ้านหลวง", "นาน้อย", "ปัว", "ท่าวังผา", "เวียงสา", "ทุ่งช้าง", "เชียงกลาง", "นาหมื่น", "สันติสุข", "บ่อเกลือ", "สองแคว", "ภูเพียง", "เฉลิมพระเกียรติ"],
+            "บึงกาฬ": ["เมืองบึงกาฬ", "พรเจริญ", "โซ่พิสัย", "เซกา", "ปากคาด", "บึงโขงหลง", "ศรีวิไล", "บุ่งคล้า"],
+            "บุรีรัมย์": ["เมืองบุรีรัมย์", "คูเมือง", "กระสัง", "นางรอง", "หนองกี่", "ละหานทราย", "ประโคนชัย", "บ้านกรวด", "พุทไธสง", "ลำปลายมาศ", "สตึก", "ปะคำ", "นาโพธิ์", "หนองหงส์", "พลับพลาชัย", "ห้วยราช", "โนนสุวรรณ", "ชำนิ", "บ้านใหม่ไชยพจน์", "โนนดินแดง", "บ้านด่าน", "แคนดง", "เฉลิมพระเกียรติ"],
+            "ปทุมธานี": ["เมืองปทุมธานี", "คลองหลวง", "ธัญบุรี", "หนองเสือ", "ลาดหลุมแก้ว", "ลำลูกกา", "สามโคก"],
+            "ประจวบคีรีขันธ์": ["เมืองประจวบคีรีขันธ์", "กุยบุรี", "ทับสะแก", "บางสะพาน", "บางสะพานน้อย", "ปราณบุรี", "หัวหิน", "สามร้อยยอด"],
+            "ปราจีนบุรี": ["เมืองปราจีนบุรี", "กบินทร์บุรี", "นาดี", "สระแก้ว", "บ้านสร้าง", "ประจันตคาม", "ศรีมหาโพธิ", "ศรีมโหสถ"],
+            "ปัตตานี": ["เมืองปัตตานี", "โคกโพธิ์", "หนองจิก", "ปะนาเระ", "มายอ", "ทุ่งยางแดง", "สายบุรี", "ไม้แก่น", "ยะหริ่ง", "ยะรัง", "กะพ้อ", "แม่ลาน"],
+            "พระนครศรีอยุธยา": ["พระนครศรีอยุธยา", "ท่าเรือ", "นครหลวง", "บางไทร", "บางบาล", "บางปะอิน", "บางปะหัน", "ผักไห่", "ภาชี", "ลาดบัวหลวง", "วังน้อย", "เสนา", "บางซ้าย", "อุทัย", "มหาราช", "บ้านแพรก"],
+            "พะเยา": ["เมืองพะเยา", "จุน", "เชียงคำ", "เชียงม่วน", "ดอกคำใต้", "ปง", "แม่ใจ", "ภูซาง", "ภูกามยาว"],
+            "พังงา": ["เมืองพังงา", "เกาะยาว", "กะปง", "ตะกั่วทุ่ง", "ตะกั่วป่า", "คุระบุรี", "ทับปุด", "ท้ายเหมือง"],
+            "พัทลุง": ["เมืองพัทลุง", "กงหรา", "เขาชัยสน", "ตะโหมด", "ควนขนุน", "ปากพะยูน", "ศรีบรรพต", "ป่าบอน", "บางแก้ว", "ป่าพะยอม", "ศรีนครินทร์"],
+            "พิจิตร": ["เมืองพิจิตร", "วังทรายพูน", "โพธิ์ประทับช้าง", "ตะพานหิน", "บางมูลนาก", "โพธิ์ทะเล", "สามง่าม", "ทับคล้อ", "สากเหล็ก", "บึงนาราง", "ดงเจริญ", "วชิรบารมี"],
+            "พิษณุโลก": ["เมืองพิษณุโลก", "นครไทย", "ชาติตระการ", "บางระกำ", "บางกระทุ่ม", "พรหมพิราม", "วัดโบสถ์", "วังทอง", "เนินมะปราง"],
+            "เพชรบุรี": ["เมืองเพชรบุรี", "เขาย้อย", "หนองหญ้าปล้อง", "ชะอำ", "ท่ายาง", "บ้านลาด", "บ้านแหลม", "แก่งกระจาน"],
+            "เพชรบูรณ์": ["เมืองเพชรบูรณ์", "ชนแดน", "หล่มสัก", "หล่มเก่า", "วิเชียรบุรี", "ศรีเทพ", "หนองไผ่", "บึงสามพัน", "น้ำหนาว", "วังโป่ง", "เขาค้อ"],
+            "แพร่": ["เมืองแพร่", "ร้องกวาง", "ลอง", "สูงเม่น", "เด่นชัย", "สอง", "วังชิ้น", "หนองม่วงไข่"],
+            "ภูเก็ต": ["เมืองภูเก็ต", "กะทู้", "ถลาง"],
+            "มหาสารคาม": ["เมืองมหาสารคาม", "แกดำ", "โกสุมพิสัย", "กันทรวิชัย", "เชียงยืน", "บรบือ", "นาเชือก", "พยัคฆภูมิพิสัย", "วาปีปทุม", "นาดูน", "ยางสีสุราช", "กุดรัง", "ชื่นชม"],
+            "มุกดาหาร": ["เมืองมุกดาหาร", "นิคมคำสร้อย", "ดอนตาล", "ดงหลวง", "คำชะอี", "หว้านใหญ่", "หนองสูง"],
+            "แม่ฮ่องสอน": ["เมืองแม่ฮ่องสอน", "ขุนยวม", "ปาย", "แม่สะเรียง", "แม่ลาน้อย", "สบเมย", "ปางมะผ้า"],
+            "ยโสธร": ["เมืองยโสธร", "ทรายมูล", "กุดชุม", "คำเขื่อนแก้ว", "ป่าติ้ว", "มหาชนะชัย", "ค้อวัง", "เลิงนกทา", "ไทยเจริญ"],
+            "ยะลา": ["เมืองยะลา", "เบตง", "บันนังสตา", "ธารโต", "ยะหา", "รามัน", "กาบัง", "กรงปินัง"],
+            "ร้อยเอ็ด": ["เมืองร้อยเอ็ด", "เกษตรวิสัย", "ปทุมรัตต์", "จตุรพักตรพิมาน", "ธวัชบุรี", "พนมไพร", "โพนทอง", "โพธิ์ชัย", "หนองพอก", "เสลภูมิ", "สุวรรณภูมิ", "เมืองสรวง", "โพนทราย", "อาจสามารถ", "เมยวดี", "ศรีสมเด็จ", "จังหาร", "เชียงขวัญ", "หนองฮี", "ทุ่งเขาหลวง"],
+            "ระนอง": ["เมืองระนอง", "ละอุ่น", "กะเปอร์", "กระบุรี", "สุขสำราญ"],
+            "ระยอง": ["เมืองระยอง", "บ้านฉาง", "แกลง", "วังจันทร์", "บ้านค่าย", "ปลวกแดง", "เขาชะเมา", "นิคมพัฒนา"],
+            "ราชบุรี": ["เมืองราชบุรี", "จอมบึง", "สวนผึ้ง", "ดำเนินสะดวก", "บ้านโป่ง", "บางแพ", "โพธาราม", "ปากท่อ", "วัดเพลง", "บ้านคา"],
+            "ลพบุรี": ["เมืองลพบุรี", "พัฒนานิคม", "โคกสำโรง", "ชัยบาดาล", "ท่าวุ้ง", "บ้านหมี่", "ท่าหลวง", "สระโบสถ์", "โคกเจริญ", "ลำสนธิ", "หนองม่วง"],
+            "ลำปาง": ["เมืองลำปาง", "แม่เมาะ", "เกาะคา", "เสริมงาม", "งาว", "แจ้ห่ม", "วังเหนือ", "เถิน", "แม่พริก", "แม่ทะ", "สบปราบ", "ห้างฉัตร", "เมืองปาน"],
+            "ลำพูน": ["เมืองลำพูน", "แม่ทา", "บ้านโฮ่ง", "ลี้", "ทุ่งหัวช้าง", "ป่าซาง", "บ้านธิ", "เวียงหนองล่อง"],
+            "เลย": ["เมืองเลย", "นาด้วง", "เชียงคาน", "ปากชม", "ด่านซ้าย", "นาแห้ว", "ภูเรือ", "ท่าลี่", "วังสะพุง", "ภูกระดึง", "ภูหลวง", "ผาขาว", "เอราวัณ", "หนองหิน"],
+            "ศรีสะเกษ": ["เมืองศรีสะเกษ", "ยางชุมน้อย", "กันทรารมย์", "กันทรลักษ์", "ขุขันธ์", "ไพรบึง", "ปรางค์กู่", "ขุนหาญ", "ราษีไศล", "อุทุมพรพิสัย", "บึงบูรพ์", "ห้วยทับทัน", "โนนคูณ", "ศรีรัตนะ", "น้ำเกลี้ยง", "วังหิน", "ภูสิงห์", "เมืองจันทร์", "เบญจลักษ์", "พยุห์", "โพธิ์ศรีสุวรรณ", "ศิลาลาด"],
+            "สกลนคร": ["เมืองสกลนคร", "กุสุมาลย์", "กุดบาก", "พรรณานิคม", "พังโคน", "วาริชภูมิ", "นิคมน้ำอูน", "วานรนิวาส", "คำตากล้า", "บ้านม่วง", "อากาศอำนวย", "สว่างแดนดิน", "ส่องดาว", "เต่างอย", "โคกศรีสุพรรณ", "เจริญศิลป์", "โพนนาแก้ว", "ภูพาน"],
+            "สงขลา": ["เมืองสงขลา", "สทิงพระ", "จะนะ", "นาทวี", "เทพา", "สะบ้าย้อย", "ระโนด", "กระแสสินธุ์", "รัตภูมิ", "สะเดา", "หาดใหญ่", "นาหม่อม", "ควนเนียง", "บางกล่ำ", "สิงหนคร", "คลองหอยโข่ง"],
+            "สตูล": ["เมืองสตูล", "ควนโดน", "ควนกาหลง", "ท่าแพ", "ละงู", "ทุ่งหว้า", "มะนัง"],
+            "สมุทรปราการ": ["เมืองสมุทรปราการ", "บางบ่อ", "บางพลี", "พระประแดง", "พระสมุทรเจดีย์", "บางเสาธง"],
+            "สมุทรสงคราม": ["เมืองสมุทรสงคราม", "บางคนที", "อัมพวา"],
+            "สมุทรสาคร": ["เมืองสมุทรสาคร", "กระทุ่มแบน", "บ้านแพ้ว"],
+            "สระแก้ว": ["เมืองสระแก้ว", "คลองหาด", "ตาพระยา", "วังน้ำเย็น", "วัฒนานคร", "อรัญประเทศ", "เขาฉกรรจ์", "โคกสูง", "วังสมบูรณ์"],
+            "สระบุรี": ["เมืองสระบุรี", "แก่งคอย", "หนองแค", "วิหารแดง", "หนองแซง", "บ้านหมอ", "ดอนพุด", "หนองโดน", "พระพุทธบาท", "เสาไห้", "มวกเหล็ก", "วังม่วง", "เฉลิมพระเกียรติ"],
+            "สิงห์บุรี": ["เมืองสิงห์บุรี", "บางระจัน", "ค่ายบางระจัน", "พรหมบุรี", "ท่าช้าง", "อินทร์บุรี"],
+            "สุโขทัย": ["เมืองสุโขทัย", "บ้านด่านลานหอย", "คีรีมาศ", "กงไกรลาศ", "ศรีสัชนาลัย", "ศรีสำโรง", "สวรรคโลก", "ศรีนคร", "ทุ่งเสลี่ยม"],
+            "สุพรรณบุรี": ["เมืองสุพรรณบุรี", "เดิมบางนางบวช", "ด่านช้าง", "บางปลาม้า", "ศรีประจันต์", "ดอนเจดีย์", "สองพี่น้อง", "สามชุก", "อู่ทอง", "หนองหญ้าไซ"],
+            "สุราษฎร์ธานี": ["เมืองสุราษฎร์ธานี", "กาญจนดิษฐ์", "ดอนสัก", "เกาะสมุย", "เกาะพะงัน", "ไชยา", "ท่าชนะ", "คีรีรัฐนิคม", "บ้านตาขุน", "พนม", "ท่าฉาง", "บ้านนาสาร", "บ้านนาเดิม", "เคียนซา", "เวียงสระ", "พระแสง", "พุนพิน", "ชัยบุรี", "วิภาวดี"],
+            "สุรินทร์": ["เมืองสุรินทร์", "ชุมพลบุรี", "ท่าตูม", "จอมพระ", "ปราสาท", "กาบเชิง", "รัตนบุรี", "สนม", "ศีขรภูมิ", "สังขะ", "ลำดวน", "สำโรงทาบ", "บัวเชด", "พนมดงรัก", "ศรีณรงค์", "เขวาสินรินทร์", "โนนนารายณ์"],
+            "หนองคาย": ["เมืองหนองคาย", "ท่าบ่อ", "โพนพิสัย", "ศรีเชียงใหม่", "สังคม", "สระใคร", "เฝ้าไร่", "รัตนวาปี", "โพธิ์ตาก"],
+            "หนองบัวลำภู": ["เมืองหนองบัวลำภู", "นากลาง", "โนนสัง", "ศรีบุญเรือง", "สุวรรณคูหา", "นาวัง"],
+            "อ่างทอง": ["เมืองอ่างทอง", "ไชโย", "ป่าโมก", "โพธิ์ทอง", "แสวงหา", "วิเศษชัยชาญ", "สามโก้"],
+            "อำนาจเจริญ": ["เมืองอำนาจเจริญ", "ชานุมาน", "ปทุมราชวงศา", "พนา", "เสนางคนิคม", "หัวตะพาน", "ลืออำนาจ"],
+            "อุดรธานี": ["เมืองอุดรธานี", "กุดจับ", "หนองวัวซอ", "กุมภวาปี", "โนนสะอาด", "หนองหาน", "ทุ่งฝน", "ไชยวาน", "ศรีธาตุ", "วังสามหมอ", "บ้านดุง", "บ้านผือ", "น้ำโสม", "เพ็ญ", "สร้างคอม", "หนองแสง", "นายูง", "พิบูลย์รักษ์", "กู่แก้ว", "ประจักษ์ศิลปาคม"],
+            "อุตรดิตถ์": ["เมืองอุตรดิตถ์", "ตรอน", "ท่าปลา", "น้ำปาด", "ฟากท่า", "บ้านโคก", "พิชัย", "ลับแล", "ทองแสนขัน"],
+            "อุทัยธานี": ["เมืองอุทัยธานี", "ทัพทัน", "สว่างอารมณ์", "หนองฉาง", "หนองขาหย่าง", "บ้านไร่", "ลานสัก", "ห้วยคต"],
+            "อุบลราชธานี": ["เมืองอุบลราชธานี", "ศรีเมืองใหม่", "โขงเจียม", "เขื่องใน", "เขมราฐ", "เดชอุดม", "นาจะหลวย", "น้ำยืน", "บุณฑริก", "ตระการพืชผล", "กุดข้าวปุ้น", "ม่วงสามสิบ", "วารินชำราบ", "พิบูลมังสาหาร", "ตาลสุม", "โพธิ์ไทร", "สำโรง", "ดอนมดแดง", "สิรินธร", "ทุ่งศรีอุดม", "นาเยีย", "นาตาล", "เหล่าเสือโก้ก", "สว่างวีระวงศ์", "น้ำขุ่น"]
+        };
+
+        const router = {
+            navigate: (viewId, data = null) => {
+                document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+                const targetView = document.getElementById(`view-${viewId}`);
+                if (targetView) {
+                    targetView.classList.remove('hidden');
+                    targetView.classList.add('fade-in');
+                }
+                state.currentView = viewId;
+                if(viewId === 'detail') renderDetail(data);
+                if(viewId === 'home') renderHome();
+                lucide.createIcons();
+            },
+            back: () => router.navigate('home')
+        };
+
+        // --- IMAGE HANDLING & COMPRESSION ---
+        
+        function resizeImage(file, maxWidth = 640, quality = 0.5) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    };
+                    img.onerror = error => reject(error);
+                };
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function getDisplayImageUrl(url) {
+            if (!url) return 'https://images.unsplash.com/photo-1558904541-efa843a96f01?w=600';
+            
+            // 1. Base64
+            if (url.startsWith('data:')) return url;
+            
+            // 2. Google User Content (CDN for Drive) - ✅ NEW
+            if (url.includes('lh3.googleusercontent.com/d/')) {
+                return url;
+            }
+
+            // 3. Google Drive View Link -> Direct Link
+            if (url.includes('drive.google.com') && url.includes('/file/d/')) {
+                const match = url.match(/\/file\/d\/(.+?)\//);
+                if (match && match[1]) {
+                    return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+                }
+            }
+            
+            return url;
+        }
+
+        function triggerFileInput(index) { document.getElementById(`file-${index}`).click(); }
+
+        async function handleFile(event, index) {
+            const file = event.target.files[0];
+            if(!file) return;
+            
+            const slot = document.getElementById(`slot-${index}`);
+            const originalContent = slot.innerHTML;
+            slot.innerHTML = `<div class="loader w-6 h-6 border-slate-200 border-t-green-500"></div>`;
+            
+            try {
+                const base64 = await resizeImage(file);
+                state.images[index] = base64;
+                slot.innerHTML = `<img src="${base64}" alt="รูปงาน"><button type="button" onclick="removeImage(event, ${index})" class="absolute top-2 right-2 bg-rose-500 text-white rounded-full p-1.5 shadow-lg"><i data-lucide="x" width="14"></i></button>`;
+                lucide.createIcons();
+            } catch (err) {
+                console.error("Image resize error:", err);
+                slot.innerHTML = originalContent; 
+                Swal.fire('ผิดพลาด', 'ไม่สามารถประมวลผลรูปภาพได้', 'error');
+            }
+        }
+
+        function removeImage(e, index) {
+            e.stopPropagation();
+            state.images[index] = null;
+            const slot = document.getElementById(`slot-${index}`);
+            slot.innerHTML = index === 0 ? `<i data-lucide="plus-circle" class="text-slate-300 mb-1" width="32"></i><p class="text-[10px] text-slate-400 font-bold uppercase">รูปหลัก</p><input type="file" id="file-0" accept="image/*" class="hidden" onchange="handleFile(event, 0)">` : `<i data-lucide="image" class="text-slate-200" width="24"></i><input type="file" id="file-${index}" accept="image/*" class="hidden" onchange="handleFile(event, index)">`;
+            lucide.createIcons();
+        }
+
+        // --- POST ACTIONS (DELETE) ---
+        async function deletePost(postId, event) {
+            if (event) event.stopPropagation();
+            
+            const result = await Swal.fire({
+                title: 'ลบประกาศ?',
+                text: "ต้องการลบประกาศรับงานนี้ใช่หรือไม่?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#94a3b8',
+                confirmButtonText: 'ลบออก',
+                cancelButtonText: 'ยกเลิก',
+                customClass: { popup: 'rounded-[2rem]' }
+            });
+
+            if (result.isConfirmed) {
+                state.posts = state.posts.filter(p => p.id !== postId);
+                
+                // If current view is detail of deleted post, go back home
+                if (state.currentView === 'detail' && state.selectedPost?.id === postId) {
+                    router.navigate('home');
+                } else {
+                    renderHome();
+                }
+
+                try {
+                    const res = await fetch(GAS_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: 'delete', id: postId })
+                    });
+                    
+                    const resData = await res.json();
+                    if (resData.status !== 'success') {
+                        throw new Error(resData.message || 'Delete failed');
+                    }
+
+                    // Delete success -> Reload data
+                    await fetchPosts();
+
+                    Swal.fire({
+                        title: 'ลบสำเร็จ',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false,
+                        customClass: { popup: 'rounded-[2rem]' }
+                    });
+
+                } catch (err) {
+                    console.error("Delete failed:", err);
+                    Swal.fire('ผิดพลาด', 'ลบข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+                }
+            }
+        }
+
+        // --- RENDER FUNCTIONS ---
+        function populateProvinceSelects() {
+            const selects = ['filter-province', 'create-province'];
+            const provinces = Object.keys(thaiProvinces).sort();
+            
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                if(!el) return;
+                // Keep the first option (ทุกจังหวัด/เลือกจังหวัด)
+                const firstOption = el.options[0].outerHTML;
+                el.innerHTML = firstOption + provinces.map(p => `<option value="${p}">${p}</option>`).join('');
+            });
+        }
+
+        function handleProvinceChange(context) {
+            const provinceSelectId = context === 'filter' ? 'filter-province' : 'create-province';
+            const amphoeSelectId = context === 'filter' ? 'filter-amphoe' : 'create-amphoe';
+            
+            const provinceSelect = document.getElementById(provinceSelectId);
+            const amphoeSelect = document.getElementById(amphoeSelectId);
+            const selectedProvince = provinceSelect.value;
+            
+            let amphoes = [];
+            if (selectedProvince && thaiProvinces[selectedProvince]) {
+                amphoes = thaiProvinces[selectedProvince].sort();
+            }
+
+            const defaultText = context === 'filter' ? 'ทุกอำเภอ' : 'เลือกอำเภอ';
+            amphoeSelect.innerHTML = `<option value="">${defaultText}</option>` + 
+                amphoes.map(a => `<option value="${a}">${a}</option>`).join('');
+            
+            if (context === 'filter') renderHome();
+        }
+
+        function renderHome() {
+            const list = document.getElementById('post-list');
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const province = document.getElementById('filter-province').value;
+            const amphoe = document.getElementById('filter-amphoe').value;
+            
+            const statusEl = document.getElementById('app-status');
+            statusEl.innerText = 'รับจ้างตัดหญ้า พ่นยา ครบวงจร';
+
+            document.getElementById('type-filters').innerHTML = categories.map(cat => `
+                <button onclick="state.filterType='${cat.label}'; renderHome();" 
+                    class="category-chip ${state.filterType === cat.label ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-100 hover:bg-slate-50'}">
+                    <i data-lucide="${cat.icon}" width="14"></i>
+                    ${cat.label}
+                </button>
+            `).join('');
+            
+            const filtered = state.posts.filter(p => {
+                // ✅ Fix: Safe String conversion
+                const matchesSearch = (String(p.title ?? '') + String(p.description ?? ''))
+                    .toLowerCase()
+                    .includes(search);
+                const matchesType = state.filterType === 'ทั้งหมด' || p.type === state.filterType;
+                const matchesProv = !province || p.province === province;
+                const matchesAmphoe = !amphoe || p.amphoe === amphoe;
+                return matchesSearch && matchesType && matchesProv && matchesAmphoe;
+            });
+
+            if(filtered.length === 0) {
+                list.innerHTML = `<div class="flex flex-col items-center justify-center text-slate-300 mt-20">
+                    <i data-lucide="sprout" width="64" class="mb-4 opacity-20"></i>
+                    <p class="font-bold text-sm">ไม่พบข้อมูลบริการที่ค้นหา</p>
+                </div>`;
+            } else {
+                list.innerHTML = filtered.map(p => {
+                    const displayImage = getDisplayImageUrl(p.images[0]);
+                    const postJson = JSON.stringify(p).replace(/"/g, '&quot;');
+                    
+                    return `
+                    <div onclick="router.navigate('detail', ${postJson})" class="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden fade-in cursor-pointer group transition-all relative">
+                        <div class="h-48 bg-slate-100 relative overflow-hidden">
+                            <img src="${displayImage}" 
+                                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="${p.title}"
+                                onerror="this.src='https://images.unsplash.com/photo-1558904541-efa843a96f01?w=600'">
+                            
+                            <div class="absolute top-4 left-4">
+                                <span class="bg-green-600 text-white text-[10px] font-black px-4 py-2 rounded-xl shadow-sm uppercase tracking-widest">${p.type}</span>
+                            </div>
+
+                            <div class="absolute top-4 right-4">
+                                <button onclick="deletePost(${p.id}, event)" class="delete-btn shadow-lg">
+                                    <i data-lucide="trash-2" width="18"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <h3 class="font-bold text-slate-800 text-lg line-clamp-1 mb-1">${p.title}</h3>
+                            <div class="flex items-center text-slate-400 text-[11px] gap-1.5 mb-5">
+                                <i data-lucide="map-pin" width="12"></i> ${p.amphoe}, ${p.province}
+                            </div>
+                            <div class="flex items-end justify-between pt-4 border-t border-slate-50">
+                                <div>
+                                    <p class="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-0.5">ราคาเริ่มต้น</p>
+                                    <p class="text-green-600 font-black text-2xl">฿${p.price.toLocaleString()}<span class="text-xs text-slate-300 font-normal"> /${p.priceUnit}</span></p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-green-600 group-hover:text-white transition-all">
+                                    <i data-lucide="arrow-right-circle" width="20"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `}).join('');
+            }
+            lucide.createIcons();
+        }
+
+        function renderDetail(data) {
+            const post = (typeof data === 'object' && data !== null) ? data : state.posts.find(p => p.id == data);
+
+            if(!post) return router.back();
+            state.selectedPost = post;
+            const validImages = post.images.filter(i => i);
+            const lineId = post.lineId || '';
+            const lineUrl = lineId ? `https://line.me/ti/p/~${lineId}` : '#';
+            
+            document.getElementById('detail-content').innerHTML = `
+                <div class="relative h-[350px]">
+                    <button onclick="router.back()" class="absolute top-6 left-6 z-20 bg-white/90 p-3 rounded-2xl shadow-xl text-slate-800 hover:bg-white transition-colors">
+                        <i data-lucide="x"></i>
+                    </button>
+                    
+                    <div class="flex h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide">
+                        ${validImages.length ? validImages.map(img => `
+                            <img src="${getDisplayImageUrl(img)}" 
+                                class="min-w-full h-full object-cover snap-start" 
+                                alt="รูปงาน"
+                                onerror="this.src='https://images.unsplash.com/photo-1558904541-efa843a96f01?w=600'">
+                        `).join('') : `<div class="min-w-full bg-slate-100 flex items-center justify-center text-slate-300 uppercase">ไม่มีภาพ</div>`}
+                    </div>
+                </div>
+                
+                <div class="p-8 space-y-8 -mt-10 bg-white rounded-t-[3rem] relative shadow-2xl pb-32">
+                    <div class="flex justify-center -mt-12 mb-4">
+                        <div class="w-16 h-1.5 bg-slate-100 rounded-full"></div>
+                    </div>
+                    
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="bg-green-50 text-green-600 text-[10px] font-black px-4 py-2 rounded-xl uppercase mb-4 inline-block">${post.type}</span>
+                            <h2 class="text-3xl font-black text-slate-800 mb-3">${post.title}</h2>
+                            <div class="flex items-center gap-2 text-slate-400 text-sm font-medium mb-4">
+                                <i data-lucide="map-pin" width="16" class="text-green-500"></i> ${post.amphoe}, ${post.province}
+                            </div>
+                            <p class="text-3xl font-black text-green-600">฿${post.price.toLocaleString()}<span class="text-sm font-medium text-slate-300"> /${post.priceUnit}</span></p>
+                        </div>
+                        <button onclick="deletePost(${post.id})" class="p-3 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-sm">
+                            <i data-lucide="trash-2" width="20"></i>
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h4 class="font-bold text-slate-800 flex items-center gap-2"><i data-lucide="info" width="18" class="text-green-500"></i> รายละเอียดบริการ</h4>
+                        <p class="text-slate-500 text-sm leading-relaxed">${post.description || 'ไม่มีรายละเอียดเพิ่มเติม'}</p>
+                    </div>
+
+                    <div class="space-y-4 pt-4 border-t border-slate-50">
+                        <h4 class="font-bold text-slate-800 flex items-center gap-2"><i data-lucide="contact" width="18" class="text-green-500"></i> ช่องทางการติดต่อ</h4>
+                        
+                        <div class="space-y-3">
+                            ${lineId ? `
+                            <a href="${lineUrl}" target="_blank" class="flex items-center p-4 bg-green-50 rounded-2xl hover:bg-green-100 transition-colors border border-green-200 group cursor-pointer">
+                                <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform shadow-md">
+                                    <i data-lucide="message-circle" width="20"></i>
+                                </div>
+                                <div class="ml-4 flex-1">
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-[10px] text-green-600 font-bold uppercase tracking-wide">Line ID</p>
+                                        <i data-lucide="external-link" width="14" class="text-green-400"></i>
+                                    </div>
+                                    <p class="text-slate-800 font-bold text-lg group-hover:text-green-700">@${lineId}</p>
+                                </div>
+                            </a>` : ''}
+
+                            <a href="tel:${post.phone}" class="flex items-center p-4 bg-blue-50 rounded-2xl hover:bg-blue-100 transition-colors border border-blue-200 group">
+                                <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform shadow-md">
+                                    <i data-lucide="phone" width="20"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-[10px] text-blue-500 font-bold uppercase tracking-wide">เบอร์โทรศัพท์</p>
+                                    <p class="text-slate-800 font-bold text-lg group-hover:text-blue-700">${post.phone}</p>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sticky bottom-0 bg-white/80 backdrop-blur-xl p-6 flex gap-4 border-t border-slate-100 safe-area-bottom z-30">
+                    <button onclick="router.back()" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold active:scale-95 transition-all shadow-xl">
+                        ปิดหน้านี้
+                    </button>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        // --- FETCH POSTS (READ) ---
+        async function fetchPosts() {
+            try {
+                const res = await fetch(GAS_API_URL + '?t=' + Date.now());
+
+                if (!res.ok) {
+                    throw new Error('HTTP ' + res.status);
+                }
+
+                const data = await res.json();
+
+                if (!Array.isArray(data)) {
+                    console.error('GAS response:', data);
+                    throw new Error('GAS did not return array');
+                }
+
+                state.posts = data.map(p => ({
+                    id: p.id,
+                    // ✅ Fix: Safe String conversion
+                    title: String(p.title || ''),
+                    type: p.type || '',
+                    province: p.province || '',
+                    amphoe: p.amphoe || '',
+                    price: Number(p.price || 0),
+                    priceUnit: p.priceUnit || '',
+                    phone: p.phone || '',
+                    lineId: p.lineId || '',
+                    description: String(p.description || ''),
+                    images: Array.isArray(p.images) ? p.images : [],
+                    timestamp: p.timestamp || ''
+                }));
+
+            } catch (err) {
+                console.error('Fetch failed:', err);
+                Swal.fire('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลจากเซิร์ฟเวอร์ได้', 'error');
+            } finally {
+                renderHome();
+            }
+        }
+
+        // --- SUBMIT FORM (CREATE) ---
+        document.getElementById('create-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerHTML = `<div class="loader w-5 h-5 mr-3 inline-block"></div> กำลังอัปโหลดรูปและบันทึก...`;
+            
+            const formData = new FormData(e.target);
+            const newPost = {
+                id: Date.now(), 
+                title: formData.get('title'), 
+                type: formData.get('type'),
+                province: formData.get('province'), 
+                amphoe: formData.get('amphoe'),
+                price: parseFloat(formData.get('price')) || 0, 
+                priceUnit: formData.get('priceUnit'),
+                phone: formData.get('phone'),
+                lineId: formData.get('lineId'),
+                description: formData.get('description'), 
+                images: [...state.images]
+                    .filter(i => typeof i === 'string' && i.startsWith('data:image'))
+                    .slice(0, 2)
+            };
+            
+            try {
+                // Send only to Server
+                const res = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Correct Header for CORS
+                    body: JSON.stringify({ action: 'create', ...newPost })
+                });
+                
+                const result = await res.json();
+                if (result.status !== 'success') {
+                    throw new Error(result.message || 'Save failed');
+                }
+                
+                await fetchPosts(); 
+
+                await Swal.fire({ 
+                    title: 'สำเร็จ!', 
+                    text: 'ลงประกาศรับงานเรียบร้อยแล้ว',
+                    icon: 'success', 
+                    confirmButtonColor: '#16a34a',
+                    customClass: { popup: 'rounded-[2rem]' }
+                });
+                
+                e.target.reset();
+                state.images = [null, null];
+                router.navigate('home');
+                
+            } catch (err) {
+                console.error("Save Error:", err);
+                Swal.fire('ผิดพลาด', 'บันทึกข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "บันทึกและลงประกาศ";
+            }
+        });
+
+        document.getElementById('search-input').addEventListener('input', renderHome);
+
+        window.onload = () => {
+            populateProvinceSelects();
+            fetchPosts();
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>
